@@ -1,2 +1,6 @@
-# Local secrets for `wrangler dev` — copy to .dev.vars and fill in
+# Local secrets for `wrangler dev` — copy to .dev.vars and fill in:
+#   cp .dev.vars.example .dev.vars
+#
+# Do NOT put real keys in this example file (it is committed to git).
+# Do NOT commit a file named "dev.vars" either — use ".dev.vars" (with the dot).
 CLERK_SECRET_KEY=sk_test_REPLACE_ME
