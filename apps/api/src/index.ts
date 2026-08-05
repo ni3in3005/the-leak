@@ -1,0 +1,189 @@
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { DEMO_SUBSCRIPTIONS, newSubscriptionId } from "@leak/shared";
+import { requireAuth } from "./auth";
+import {
+  countSubscriptions,
+  deleteSubscription,
+  getSubscription,
+  insertSubscription,
+  listSubscriptions,
+  markSeeded,
+  replaceAllSubscriptions,
+  updateSubscription,
+  wasSeeded,
+} from "./db";
+import type { AuthVariables, Env } from "./env";
+import { normalizeImportedFile, parseSubscriptionInput } from "./validate";
+
+const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+
+app.use("*", async (c, next) => {
+  const origins = (c.env.CORS_ORIGIN || "http://localhost:5173")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const corsMiddleware = cors({
+    origin: origins,
+    allowHeaders: ["Authorization", "Content-Type"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  });
+  return corsMiddleware(c, next);
+});
+
+app.get("/health", (c) => c.json({ ok: true, service: "leak-api" }));
+
+app.use("/api/*", requireAuth);
+
+app.get("/api/subscriptions", async (c) => {
+  const userId = c.get("userId");
+  const subscriptions = await listSubscriptions(c.env.DB, userId);
+  return c.json({ subscriptions });
+});
+
+app.post("/api/subscriptions", async (c) => {
+  const userId = c.get("userId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = parseSubscriptionInput(body);
+  if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+  const id = newSubscriptionId();
+  const sub = await insertSubscription(c.env.DB, userId, id, parsed);
+  return c.json({ subscription: sub }, 201);
+});
+
+app.put("/api/subscriptions/:id", async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const parsed = parseSubscriptionInput(body);
+  if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+  const sub = await updateSubscription(c.env.DB, userId, id, parsed);
+  if (!sub) return c.json({ error: "Not found" }, 404);
+  return c.json({ subscription: sub });
+});
+
+app.delete("/api/subscriptions/:id", async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const ok = await deleteSubscription(c.env.DB, userId, id);
+  if (!ok) return c.json({ error: "Not found" }, 404);
+  return c.json({ ok: true });
+});
+
+/** Seed demo data once per user when they have zero subscriptions. */
+app.post("/api/seed", async (c) => {
+  const userId = c.get("userId");
+  const count = await countSubscriptions(c.env.DB, userId);
+  if (count > 0) {
+    return c.json({ seeded: false, reason: "already_has_data", subscriptions: await listSubscriptions(c.env.DB, userId) });
+  }
+  if (await wasSeeded(c.env.DB, userId)) {
+    return c.json({ seeded: false, reason: "already_seeded", subscriptions: [] });
+  }
+
+  const items = DEMO_SUBSCRIPTIONS.map((s) => ({
+    id: newSubscriptionId(),
+    name: s.name,
+    category: s.category,
+    currency: s.currency,
+    cost: s.cost,
+    startDate: s.startDate,
+    billingCycle: s.billingCycle ?? "monthly",
+  }));
+
+  await replaceAllSubscriptions(c.env.DB, userId, items);
+  await markSeeded(c.env.DB, userId);
+  const subscriptions = await listSubscriptions(c.env.DB, userId);
+  return c.json({ seeded: true, subscriptions });
+});
+
+/**
+ * Export subscriptions JSON.
+ * Stores a backup copy in R2 under exports/{userId}/{timestamp}.json
+ * and returns the JSON payload for download.
+ */
+app.post("/api/export", async (c) => {
+  const userId = c.get("userId");
+  const subscriptions = await listSubscriptions(c.env.DB, userId);
+  const payload = { subscriptions };
+  const json = JSON.stringify(payload, null, 2);
+  const key = `exports/${userId}/${Date.now()}-subscriptions.json`;
+  await c.env.BACKUPS.put(key, json, {
+    httpMetadata: { contentType: "application/json" },
+    customMetadata: { userId, type: "export" },
+  });
+  return c.json({
+    key,
+    filename: "subscriptions.json",
+    data: payload,
+  });
+});
+
+/**
+ * Import subscriptions from JSON body.
+ * Stores the uploaded JSON in R2, then replaces the user's D1 rows.
+ * Body: { subscriptions: [...], mode?: "replace" | "merge" }
+ */
+app.post("/api/import", async (c) => {
+  const userId = c.get("userId");
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const mode = (body as { mode?: string }).mode === "merge" ? "merge" : "replace";
+  const normalized = normalizeImportedFile(body);
+  if ("error" in normalized) return c.json({ error: normalized.error }, 400);
+
+  const key = `imports/${userId}/${Date.now()}-subscriptions.json`;
+  await c.env.BACKUPS.put(key, JSON.stringify(body, null, 2), {
+    httpMetadata: { contentType: "application/json" },
+    customMetadata: { userId, type: "import", mode },
+  });
+
+  if (mode === "replace") {
+    await replaceAllSubscriptions(
+      c.env.DB,
+      userId,
+      normalized.map((s) => ({
+        id: newSubscriptionId(),
+        name: s.name,
+        category: s.category,
+        currency: s.currency,
+        cost: s.cost,
+        startDate: s.startDate,
+        billingCycle: s.billingCycle,
+      }))
+    );
+  } else {
+    for (const s of normalized) {
+      await insertSubscription(c.env.DB, userId, newSubscriptionId(), {
+        name: s.name,
+        category: s.category,
+        currency: s.currency,
+        cost: s.cost,
+        startDate: s.startDate,
+        billingCycle: s.billingCycle,
+      });
+    }
+  }
+
+  const subscriptions = await listSubscriptions(c.env.DB, userId);
+  return c.json({ ok: true, key, mode, subscriptions });
+});
+
+app.get("/api/me", async (c) => {
+  const userId = c.get("userId");
+  const count = await countSubscriptions(c.env.DB, userId);
+  const seeded = await wasSeeded(c.env.DB, userId);
+  return c.json({ userId, subscriptionCount: count, seeded });
+});
+
+app.notFound((c) => c.json({ error: "Not found" }, 404));
+
+app.onError((err, c) => {
+  console.error(err);
+  return c.json({ error: "Internal server error" }, 500);
+});
+
+export default app;

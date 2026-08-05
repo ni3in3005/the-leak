@@ -1,0 +1,26 @@
+{
+  "name": "the-leak",
+  "private": true,
+  "version": "1.0.0",
+  "description": "The Leak — subscription tracker on Cloudflare (Pages + Workers + D1 + R2 + Clerk)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@leak/web & npm run dev --workspace=@leak/api",
+    "dev:web": "npm run dev --workspace=@leak/web",
+    "dev:api": "npm run dev --workspace=@leak/api",
+    "build": "npm run build --workspace=@leak/shared && npm run build --workspace=@leak/web && npm run build --workspace=@leak/api",
+    "build:web": "npm run build --workspace=@leak/shared && npm run build --workspace=@leak/web",
+    "build:api": "npm run build --workspace=@leak/shared && npm run build --workspace=@leak/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate:local": "npm run db:migrate:local --workspace=@leak/api",
+    "db:migrate:remote": "npm run db:migrate:remote --workspace=@leak/api",
+    "deploy:api": "npm run deploy --workspace=@leak/api",
+    "deploy:web": "npm run deploy --workspace=@leak/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
