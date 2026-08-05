@@ -31,14 +31,59 @@ app.use("*", async (c, next) => {
   return corsMiddleware(c, next);
 });
 
-app.get("/health", (c) => c.json({ ok: true, service: "leak-api" }));
+app.get("/health", (c) =>
+  c.json({
+    ok: true,
+    service: "leak-api",
+    hasDb: Boolean(c.env.DB),
+    hasR2: Boolean(c.env.BACKUPS),
+  })
+);
+
+/** Guard: D1/R2 missing usually means `wrangler dev --remote` without a real D1 id. */
+app.use("/api/*", async (c, next) => {
+  if (!c.env.DB) {
+    return c.json(
+      {
+        error:
+          "D1 database binding (DB) is missing. Run the API with `npm run dev:api` (uses --local), then `npm run db:migrate:local`. Do not use `wrangler dev --remote` until you have created a real D1 database and put its database_id in wrangler.toml.",
+      },
+      500
+    );
+  }
+  if (!c.env.BACKUPS) {
+    return c.json(
+      {
+        error:
+          "R2 binding (BACKUPS) is missing. Use local mode (`wrangler dev --local`) for development.",
+      },
+      500
+    );
+  }
+  await next();
+});
 
 app.use("/api/*", requireAuth);
 
 app.get("/api/subscriptions", async (c) => {
   const userId = c.get("userId");
-  const subscriptions = await listSubscriptions(c.env.DB, userId);
-  return c.json({ subscriptions });
+  try {
+    const subscriptions = await listSubscriptions(c.env.DB, userId);
+    return c.json({ subscriptions });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // Common when migrations were never applied locally
+    if (/no such table/i.test(message)) {
+      return c.json(
+        {
+          error:
+            "D1 tables are missing. From the repo root run: npm run db:migrate:local — then restart npm run dev:api.",
+        },
+        500
+      );
+    }
+    throw err;
+  }
 });
 
 app.post("/api/subscriptions", async (c) => {
