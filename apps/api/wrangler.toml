@@ -6,19 +6,19 @@ compatibility_flags = ["nodejs_compat"]
 
 # Replace after: wrangler d1 create leak-db
 [[d1_databases]]
-binding = "DB"
+binding = "leak-db"
 database_name = "leak-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "b3564f2f-1b39-4124-9e95-7a8752dd0276"
 migrations_dir = "../../migrations"
 
 # Replace after: wrangler r2 bucket create leak-backups
 [[r2_buckets]]
-binding = "BACKUPS"
+binding = "leak_backups"
 bucket_name = "leak-backups"
 
 [vars]
 # Public Clerk publishable key is fine in vars; secret goes in .dev.vars / secrets
-CLERK_PUBLISHABLE_KEY = "pk_test_REPLACE_ME"
+CLERK_PUBLISHABLE_KEY = "pk_test_dW5iaWFzZWQtY2hpcG11bmstNjguY2xlcmsuYWNjb3VudHMuZGV2JA"
 # Comma-separated allowed frontend origins for CORS
 CORS_ORIGIN = "http://localhost:5173"
 
