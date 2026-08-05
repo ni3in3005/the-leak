@@ -95,8 +95,13 @@ For production Pages, set it to your Worker URL, e.g. `https://leak-api.<account
 
 ## 5. Local development
 
+**Important:** local API always uses `--local` (SQLite on your machine). Do **not** press keys / flags that switch Wrangler to **remote** preview until you have a real D1 `database_id`.
+
 ```bash
-# terminal 1 — API (D1 local + R2 local)
+# once — create local D1 tables
+npm run db:migrate:local
+
+# terminal 1 — API (local D1 + local R2)
 npm run dev:api
 
 # terminal 2 — React
@@ -104,6 +109,15 @@ npm run dev:web
 ```
 
 Open http://localhost:5173 — sign in with Clerk, then the app loads. First visit with an empty account seeds the original demo subscriptions once.
+
+### Local troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `Cannot read properties of undefined (reading 'prepare')` | D1 binding missing — usually Wrangler ran in **remote** mode with a placeholder DB id. Stop the API, run `npm run db:migrate:local`, then `npm run dev:api` (must show local, not “Starting remote preview…”). |
+| Log says `Starting remote preview…` / `Shutting down local server…` | You left local mode. Restart with `npm run dev:api` and do not pass `--remote`. |
+| `no such table: subscriptions` | Run `npm run db:migrate:local`, restart API. |
+| `/health` shows `"hasDb": false` | Bindings not loaded — confirm `apps/api/wrangler.toml` has a `[[d1_databases]]` block and you are on `--local`. |
 
 ## 6. Deploy (free tier)
 
