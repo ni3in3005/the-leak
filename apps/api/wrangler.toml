@@ -4,14 +4,18 @@ main = "src/index.ts"
 compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Replace after: wrangler d1 create leak-db
+# Local-only placeholder UUID works for `wrangler dev --local`.
+# After `wrangler d1 create leak-db`, replace database_id with the real remote id
+# (keep preview_database_id as-is for local SQLite).
 [[d1_databases]]
 binding = "DB"
 database_name = "leak-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "00000000-0000-4000-8000-000000000001"
+preview_database_id = "local-leak-db"
 migrations_dir = "../../migrations"
 
-# Replace after: wrangler r2 bucket create leak-backups
+# Create with: wrangler r2 bucket create leak-backups
+# Local `wrangler dev --local` still works before the remote bucket exists.
 [[r2_buckets]]
 binding = "BACKUPS"
 bucket_name = "leak-backups"
@@ -21,6 +25,10 @@ bucket_name = "leak-backups"
 CLERK_PUBLISHABLE_KEY = "pk_test_REPLACE_ME"
 # Comma-separated allowed frontend origins for CORS
 CORS_ORIGIN = "http://localhost:5173"
+
+[dev]
+port = 8787
+local_protocol = "http"
 
 # Secrets (set via `wrangler secret put` or apps/api/.dev.vars for local):
 # CLERK_SECRET_KEY=sk_test_...
