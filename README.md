@@ -107,24 +107,82 @@ Open http://localhost:5173 — sign in with Clerk, then the app loads. First vis
 
 ## 6. Deploy (free tier)
 
-```bash
-# API Worker
-npm run deploy:api
+Deploy uploads values from **`apps/api/wrangler.toml` → `[vars]`**.  
+If deploy output still shows `pk_test_…` and `CORS_ORIGIN = http://localhost:5173`, those lines were not updated before `npm run deploy:api`.
 
-# Frontend Pages
-# set VITE_API_URL to the Worker URL before building
-VITE_API_URL=https://leak-api.<account>.workers.dev npm run build --workspace=@leak/web
+### 6a. Switch Clerk to Production keys
+
+1. Clerk Dashboard → open your app → switch to **Production**
+2. Copy:
+   - Publishable key → `pk_live_…`
+   - Secret key → `sk_live_…`
+3. In Clerk Production, allow your live frontend origin, e.g. `https://the-leak.pages.dev`
+
+### 6b. Edit Worker vars (required before every prod deploy that needs new origins/keys)
+
+Open `apps/api/wrangler.toml` and set:
+
+```toml
+[vars]
+CLERK_PUBLISHABLE_KEY = "pk_live_YOUR_KEY_HERE"
+CORS_ORIGIN = "http://localhost:5173,https://YOUR_PAGES_SUBDOMAIN.pages.dev"
+```
+
+Example for this project’s Worker host:
+
+```toml
+CORS_ORIGIN = "http://localhost:5173,https://the-leak.pages.dev"
+```
+
+(Use your real Pages URL — check Cloudflare → Workers & Pages → your Pages project.)
+
+Keep your real `database_id` as-is (do not put the placeholder UUID back).
+
+### 6c. Set the Worker secret (Production)
+
+```bash
+cd apps/api
+npx wrangler secret put CLERK_SECRET_KEY
+# paste sk_live_... then Enter
+```
+
+### 6d. Deploy API
+
+```bash
+# from repo root
+npm run deploy:api
+```
+
+Confirm the deploy summary shows:
+
+- `CLERK_PUBLISHABLE_KEY ("pk_live_…")`  ← not `pk_test_`
+- `CORS_ORIGIN` includes your `*.pages.dev` URL  ← not only localhost
+
+### 6e. Rebuild & deploy the website (this fixes the browser Clerk warning)
+
+The browser warning comes from the **frontend** key baked in at build time (`VITE_CLERK_PUBLISHABLE_KEY`), not from the Worker alone.
+
+```bash
+# PowerShell (Windows) — set for this session, then build + deploy
+cd C:\Users\NitinBagul\vs-github\digital_coder
+$env:VITE_CLERK_PUBLISHABLE_KEY="pk_live_YOUR_KEY_HERE"
+$env:VITE_API_URL="https://leak-api.ni3in3005.workers.dev"
+npm run build --workspace=@leak/web
 npm run deploy --workspace=@leak/web
 ```
 
-Or connect the `apps/web` build to Cloudflare Pages in the dashboard (`npm run build --workspace=@leak/web`, output `apps/web/dist`).
+Or put the same two values in `apps/web/.env.local` (never commit that file), then build/deploy.
 
-After deploy, update:
+Hard-refresh the live site (`Ctrl+Shift+R`). The “development keys” console warning should go away.
 
-- Clerk allowed origins → your `*.pages.dev` URL
-- Worker `CORS_ORIGIN` → same Pages URL
-- `VITE_API_URL` → Worker URL, rebuild & redeploy Pages
+### Deploy troubleshooting
 
+| Symptom | Fix |
+| --- | --- |
+| Deploy still shows `pk_test_` / only localhost CORS | Edit `apps/api/wrangler.toml` `[vars]`, save, run `npm run deploy:api` again |
+| Browser: “Development keys” | Rebuild Pages with `VITE_CLERK_PUBLISHABLE_KEY=pk_live_…` and redeploy web |
+| Browser CORS / blocked API from Pages | Add your `https://….pages.dev` to `CORS_ORIGIN`, redeploy API |
+| API 401 after switching to live keys | Re-run `wrangler secret put CLERK_SECRET_KEY` with `sk_live_…`, and use matching `pk_live_` on the web build |
 ## API (all require `Authorization: Bearer <Clerk JWT>` except `/health`)
 
 | Method | Path | Description |

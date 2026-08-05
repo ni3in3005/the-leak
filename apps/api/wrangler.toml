@@ -4,23 +4,38 @@ main = "src/index.ts"
 compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Replace after: wrangler d1 create leak-db
+# Local-only placeholder UUID works for `wrangler dev --local`.
+# After `wrangler d1 create leak-db`, replace database_id with the real remote id
+# (keep preview_database_id as-is for local SQLite).
 [[d1_databases]]
 binding = "DB"
 database_name = "leak-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "00000000-0000-4000-8000-000000000001"
+preview_database_id = "local-leak-db"
 migrations_dir = "../../migrations"
 
-# Replace after: wrangler r2 bucket create leak-backups
+# Create with: wrangler r2 bucket create leak-backups
 [[r2_buckets]]
 binding = "BACKUPS"
 bucket_name = "leak-backups"
 
+#
+# IMPORTANT: `npm run deploy:api` uploads THIS [vars] block to Cloudflare.
+# If you still see pk_test_ / localhost:5173 after deploy, you did not edit
+# these two lines before deploying (or you forgot to redeploy after editing).
+#
+# Local testing: keep pk_test_ and include http://localhost:5173
+# Production:    use pk_live_ and include your Pages URL
+#
 [vars]
-# Public Clerk publishable key is fine in vars; secret goes in .dev.vars / secrets
 CLERK_PUBLISHABLE_KEY = "pk_test_REPLACE_ME"
-# Comma-separated allowed frontend origins for CORS
+# Comma-separated list — include EVERY frontend origin that calls the API
 CORS_ORIGIN = "http://localhost:5173"
 
-# Secrets (set via `wrangler secret put` or apps/api/.dev.vars for local):
-# CLERK_SECRET_KEY=sk_test_...
+[dev]
+port = 8787
+local_protocol = "http"
+
+# Secret (never put in this file):
+#   Local:      apps/api/.dev.vars  →  CLERK_SECRET_KEY=sk_test_...
+#   Production: npx wrangler secret put CLERK_SECRET_KEY  →  paste sk_live_...
