@@ -1,0 +1,25 @@
+{
+  "name": "@leak/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "db:migrate:local": "wrangler d1 migrations apply leak-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply leak-db --remote",
+    "db:create": "wrangler d1 create leak-db"
+  },
+  "dependencies": {
+    "@clerk/backend": "^1.24.2",
+    "@leak/shared": "*",
+    "hono": "^4.7.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250317.0",
+    "typescript": "^5.8.2",
+    "wrangler": "^4.4.0"
+  }
+}
