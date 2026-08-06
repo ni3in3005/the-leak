@@ -1,17 +1,14 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { DEMO_SUBSCRIPTIONS, newSubscriptionId } from "@leak/shared";
+import { newSubscriptionId } from "@leak/shared";
 import { requireAuth } from "./auth";
 import {
   countSubscriptions,
   deleteSubscription,
-  getSubscription,
   insertSubscription,
   listSubscriptions,
-  markSeeded,
   replaceAllSubscriptions,
   updateSubscription,
-  wasSeeded,
 } from "./db";
 import type { AuthVariables, Env } from "./env";
 import { normalizeImportedFile, parseSubscriptionInput } from "./validate";
@@ -115,33 +112,6 @@ app.delete("/api/subscriptions/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Seed demo data once per user when they have zero subscriptions. */
-app.post("/api/seed", async (c) => {
-  const userId = c.get("userId");
-  const count = await countSubscriptions(c.env.DB, userId);
-  if (count > 0) {
-    return c.json({ seeded: false, reason: "already_has_data", subscriptions: await listSubscriptions(c.env.DB, userId) });
-  }
-  if (await wasSeeded(c.env.DB, userId)) {
-    return c.json({ seeded: false, reason: "already_seeded", subscriptions: [] });
-  }
-
-  const items = DEMO_SUBSCRIPTIONS.map((s) => ({
-    id: newSubscriptionId(),
-    name: s.name,
-    category: s.category,
-    currency: s.currency,
-    cost: s.cost,
-    startDate: s.startDate,
-    billingCycle: s.billingCycle ?? "monthly",
-  }));
-
-  await replaceAllSubscriptions(c.env.DB, userId, items);
-  await markSeeded(c.env.DB, userId);
-  const subscriptions = await listSubscriptions(c.env.DB, userId);
-  return c.json({ seeded: true, subscriptions });
-});
-
 /**
  * Export subscriptions JSON.
  * Stores a backup copy in R2 under exports/{userId}/{timestamp}.json
@@ -220,8 +190,7 @@ app.post("/api/import", async (c) => {
 app.get("/api/me", async (c) => {
   const userId = c.get("userId");
   const count = await countSubscriptions(c.env.DB, userId);
-  const seeded = await wasSeeded(c.env.DB, userId);
-  return c.json({ userId, subscriptionCount: count, seeded });
+  return c.json({ userId, subscriptionCount: count });
 });
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
