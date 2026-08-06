@@ -24,7 +24,6 @@ export function Dashboard() {
   const [banner, setBanner] = useState<{ text: string; error?: boolean } | null>(null);
   const [modalSub, setModalSub] = useState<Subscription | null | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const seededRef = useRef(false);
 
   const showBanner = useCallback((text: string, error = false) => {
     setBanner({ text, error });
@@ -43,17 +42,7 @@ export function Dashboard() {
     (async () => {
       try {
         setLoading(true);
-        const list = await refresh();
-        if (cancelled) return;
-        if (!seededRef.current && list.length === 0) {
-          seededRef.current = true;
-          const token = await getAccessToken();
-          const result = await api.seedDemo(token);
-          if (!cancelled && result.seeded) {
-            setSubscriptions(result.subscriptions);
-            showBanner("Loaded demo subscriptions so you can see how The Leak works. Edit or delete freely.");
-          }
-        }
+        await refresh();
       } catch (e) {
         if (!cancelled) {
           showBanner(e instanceof Error ? e.message : "Failed to load subscriptions", true);
@@ -65,7 +54,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, refresh, getAccessToken, showBanner]);
+  }, [isLoaded, refresh, showBanner]);
 
   async function handleSave(input: SubscriptionInput) {
     setBusy(true);

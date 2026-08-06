@@ -17,7 +17,7 @@ Keeps the original **The Leak** UI: live ticking spend, billing countdown gauges
 ```
 apps/web          React SPA → Cloudflare Pages
 apps/api          Hono Worker → D1 + R2 + Clerk JWT
-packages/shared   Types + billing math + demo seed data
+packages/shared   Types + billing math + shared helpers
 migrations/       D1 SQL migrations
 ```
 
@@ -108,7 +108,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-Open http://localhost:5173 — sign in with Clerk, then the app loads. First visit with an empty account seeds the original demo subscriptions once.
+Open http://localhost:5173 — sign in with Clerk, then the app loads. New accounts start empty (add subscriptions or Import JSON).
 
 ### Local troubleshooting
 
@@ -148,15 +148,13 @@ After deploy, update:
 | POST | `/api/subscriptions` | Create |
 | PUT | `/api/subscriptions/:id` | Update |
 | DELETE | `/api/subscriptions/:id` | Delete |
-| POST | `/api/seed` | Seed demo data once if empty |
 | POST | `/api/export` | JSON export + R2 backup |
 | POST | `/api/import` | Import JSON (`mode`: `replace` \| `merge`) + R2 backup |
 | GET | `/api/me` | User meta |
 
 ## Data model (D1)
 
-`subscriptions`: `id`, `user_id`, `name`, `category`, `currency`, `cost`, `start_date`, `billing_cycle`, timestamps.  
-`user_meta`: tracks whether demo seed already ran for a user.
+`subscriptions`: `id`, `user_id`, `name`, `category`, `currency`, `cost`, `start_date`, `billing_cycle`, timestamps.
 
 R2 keys: `exports/{userId}/{ts}-subscriptions.json`, `imports/{userId}/{ts}-subscriptions.json`.
 

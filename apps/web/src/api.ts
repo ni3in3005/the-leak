@@ -46,14 +46,6 @@ export function deleteSubscription(token: string, id: string) {
   });
 }
 
-export function seedDemo(token: string) {
-  return apiFetch<{ seeded: boolean; subscriptions: Subscription[]; reason?: string }>(
-    "/api/seed",
-    token,
-    { method: "POST" }
-  );
-}
-
 export function exportSubscriptions(token: string) {
   return apiFetch<{ key: string; filename: string; data: SubscriptionsFile }>(
     "/api/export",

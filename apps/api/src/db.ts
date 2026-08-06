@@ -127,24 +127,6 @@ export async function countSubscriptions(db: D1Database, userId: string): Promis
   return row?.c ?? 0;
 }
 
-export async function wasSeeded(db: D1Database, userId: string): Promise<boolean> {
-  const row = await db
-    .prepare(`SELECT seeded FROM user_meta WHERE user_id = ?`)
-    .bind(userId)
-    .first<{ seeded: number }>();
-  return (row?.seeded ?? 0) === 1;
-}
-
-export async function markSeeded(db: D1Database, userId: string): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO user_meta (user_id, seeded) VALUES (?, 1)
-       ON CONFLICT(user_id) DO UPDATE SET seeded = 1`
-    )
-    .bind(userId)
-    .run();
-}
-
 export async function replaceAllSubscriptions(
   db: D1Database,
   userId: string,
