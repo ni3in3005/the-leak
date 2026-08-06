@@ -16,9 +16,10 @@ import { normalizeImportedFile, parseSubscriptionInput } from "./validate";
 const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 app.use("*", async (c, next) => {
-  const origins = (c.env.CORS_ORIGIN || "http://localhost:5173")
+  // Normalize: browsers send Origin without a trailing slash
+  const origins = (c.env.CORS_ORIGIN || "http://localhost:5173,https://the-leak.pages.dev")
     .split(",")
-    .map((o) => o.trim())
+    .map((o) => o.trim().replace(/\/$/, ""))
     .filter(Boolean);
   const corsMiddleware = cors({
     origin: origins,
