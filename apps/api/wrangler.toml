@@ -23,7 +23,7 @@ bucket_name = "leak-backups"
 # Public Clerk publishable key is fine in vars; secret goes in .dev.vars / secrets
 CLERK_PUBLISHABLE_KEY = "pk_test_dW5iaWFzZWQtY2hpcG11bmstNjguY2xlcmsuYWNjb3VudHMuZGV2JA"
 # Comma-separated allowed frontend origins for CORS
-CORS_ORIGIN = "https://the-leak.pages.dev/"
+CORS_ORIGIN = "https://the-leak.pages.dev"
 
 [dev]
 port = 8787
