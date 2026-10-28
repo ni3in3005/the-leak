@@ -1,5 +1,10 @@
 import type { Subscription } from "@leak/shared";
-import { cycleMonthsOf, fmtMoney, getCycleInfo, monthlyEquivalent } from "@leak/shared";
+import {
+  computeLiveSpent,
+  fmtMoney,
+  isPaused,
+  monthlyEquivalent,
+} from "@leak/shared";
 
 interface Props {
   subscriptions: Subscription[];
@@ -9,11 +14,14 @@ export function StatsStrip({ subscriptions }: Props) {
   let monthly = 0;
   let lifetime = 0;
   let biggest: { name: string; life: number; cur: string } | null = null;
+  let active = 0;
 
   for (const s of subscriptions) {
-    const info = getCycleInfo(s.startDate, cycleMonthsOf(s));
-    monthly += monthlyEquivalent(s);
-    const life = info.charges * Number(s.cost);
+    if (!isPaused(s)) {
+      active += 1;
+      monthly += monthlyEquivalent(s);
+    }
+    const life = computeLiveSpent(s);
     lifetime += life;
     if (!biggest || life > biggest.life) {
       biggest = { name: s.name, life, cur: s.currency || "₹" };
@@ -21,6 +29,7 @@ export function StatsStrip({ subscriptions }: Props) {
   }
 
   const n = subscriptions.length;
+  const paused = n - active;
 
   return (
     <div className="stats">
@@ -28,7 +37,9 @@ export function StatsStrip({ subscriptions }: Props) {
         <div className="label">Monthly burn</div>
         <div className="val">{n ? fmtMoney(monthly, "₹") : "—"}</div>
         <div className="foot">
-          {n ? `across ${n} subscription${n > 1 ? "s" : ""}` : "nothing tracked yet"}
+          {n
+            ? `across ${active} active subscription${active === 1 ? "" : "s"}`
+            : "nothing tracked yet"}
         </div>
       </div>
       <div className="stat">
@@ -38,8 +49,10 @@ export function StatsStrip({ subscriptions }: Props) {
       </div>
       <div className="stat">
         <div className="label">Active subscriptions</div>
-        <div className="val">{n || "0"}</div>
-        <div className="foot">{n ? "renewing on schedule" : "\u00a0"}</div>
+        <div className="val">{n ? String(active) : "0"}</div>
+        <div className="foot">
+          {n ? (paused ? `${paused} paused` : "renewing on schedule") : "\u00a0"}
+        </div>
       </div>
       <div className="stat">
         <div className="label">Biggest leak</div>

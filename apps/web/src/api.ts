@@ -46,6 +46,19 @@ export function deleteSubscription(token: string, id: string) {
   });
 }
 
+export function pauseSubscription(token: string, id: string, pausedAt: string) {
+  return apiFetch<{ subscription: Subscription }>(`/api/subscriptions/${id}/pause`, token, {
+    method: "POST",
+    body: JSON.stringify({ pausedAt }),
+  });
+}
+
+export function resumeSubscription(token: string, id: string) {
+  return apiFetch<{ subscription: Subscription }>(`/api/subscriptions/${id}/resume`, token, {
+    method: "POST",
+  });
+}
+
 export function seedDemo(token: string) {
   return apiFetch<{ seeded: boolean; subscriptions: Subscription[]; reason?: string }>(
     "/api/seed",

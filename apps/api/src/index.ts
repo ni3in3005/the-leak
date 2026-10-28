@@ -10,18 +10,20 @@ import {
   listSubscriptions,
   markSeeded,
   replaceAllSubscriptions,
+  setPausedAt,
   updateSubscription,
   wasSeeded,
 } from "./db";
 import type { AuthVariables, Env } from "./env";
-import { normalizeImportedFile, parseSubscriptionInput } from "./validate";
+import { normalizeImportedFile, parseDateField, parseSubscriptionInput } from "./validate";
 
 const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 app.use("*", async (c, next) => {
-  const origins = (c.env.CORS_ORIGIN || "http://localhost:5173")
+  // Browsers send Origin without a trailing slash — normalize both sides
+  const origins = (c.env.CORS_ORIGIN || "http://localhost:5173,https://the-leak.pages.dev")
     .split(",")
-    .map((o) => o.trim())
+    .map((o) => o.trim().replace(/\/$/, ""))
     .filter(Boolean);
   const corsMiddleware = cors({
     origin: origins,
@@ -115,6 +117,42 @@ app.delete("/api/subscriptions/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+/** Pause a subscription as of a given date (YYYY-MM-DD). */
+app.post("/api/subscriptions/:id/pause", async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const pausedAt = parseDateField(
+    body && typeof body === "object" ? (body as { pausedAt?: unknown }).pausedAt : undefined,
+    "pausedAt"
+  );
+  if (pausedAt && typeof pausedAt === "object" && "error" in pausedAt) {
+    return c.json({ error: pausedAt.error }, 400);
+  }
+  if (!pausedAt) {
+    return c.json({ error: "pausedAt (YYYY-MM-DD) is required" }, 400);
+  }
+
+  const existing = await getSubscription(c.env.DB, userId, id);
+  if (!existing) return c.json({ error: "Not found" }, 404);
+  if (pausedAt < existing.startDate) {
+    return c.json({ error: "Pause date cannot be before the start date" }, 400);
+  }
+
+  const sub = await setPausedAt(c.env.DB, userId, id, pausedAt);
+  if (!sub) return c.json({ error: "Not found" }, 404);
+  return c.json({ subscription: sub });
+});
+
+/** Resume a paused subscription. */
+app.post("/api/subscriptions/:id/resume", async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const sub = await setPausedAt(c.env.DB, userId, id, null);
+  if (!sub) return c.json({ error: "Not found" }, 404);
+  return c.json({ subscription: sub });
+});
+
 /** Seed demo data once per user when they have zero subscriptions. */
 app.post("/api/seed", async (c) => {
   const userId = c.get("userId");
@@ -198,6 +236,7 @@ app.post("/api/import", async (c) => {
         cost: s.cost,
         startDate: s.startDate,
         billingCycle: s.billingCycle,
+        pausedAt: s.pausedAt ?? null,
       }))
     );
   } else {
@@ -209,6 +248,7 @@ app.post("/api/import", async (c) => {
         cost: s.cost,
         startDate: s.startDate,
         billingCycle: s.billingCycle,
+        pausedAt: s.pausedAt ?? null,
       });
     }
   }
