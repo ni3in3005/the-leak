@@ -5,6 +5,21 @@ export function cycleMonthsOf(s: Pick<Subscription, "billingCycle"> | BillingCyc
   return cycle === "yearly" ? 12 : 1;
 }
 
+export function isPaused(s: Pick<Subscription, "pausedAt">): boolean {
+  return Boolean(s.pausedAt);
+}
+
+/** When paused, freeze calculations at the pause date (end of that day). */
+export function effectiveNow(
+  s: Pick<Subscription, "pausedAt">,
+  now = new Date()
+): Date {
+  if (s.pausedAt) {
+    return new Date(s.pausedAt + "T23:59:59");
+  }
+  return now;
+}
+
 export function addMonthsClamped(date: Date, months: number): Date {
   const d = new Date(date);
   const day = d.getDate();
@@ -48,15 +63,22 @@ export function getCycleInfo(startStr: string, cycleMonths = 1, now = new Date()
   return { next, prev, charges, cycleDays, pct, remainingMs: next.getTime() - now.getTime() };
 }
 
-export function computeLiveSpent(s: Pick<Subscription, "startDate" | "billingCycle" | "cost">, now = new Date()): number {
-  const info = getCycleInfo(s.startDate, cycleMonthsOf(s), now);
+export function computeLiveSpent(
+  s: Pick<Subscription, "startDate" | "billingCycle" | "cost" | "pausedAt">,
+  now = new Date()
+): number {
+  const asOf = effectiveNow(s, now);
+  const info = getCycleInfo(s.startDate, cycleMonthsOf(s), asOf);
   const elapsedInCycle = info.cycleDays * 86400 * 1000 - info.remainingMs;
   const fractionCost = (elapsedInCycle / 1000) * (Number(s.cost) / (info.cycleDays * 86400));
   const baseCharges = info.charges - 1;
   return baseCharges * Number(s.cost) + fractionCost;
 }
 
-export function monthlyEquivalent(s: Pick<Subscription, "billingCycle" | "cost">): number {
+export function monthlyEquivalent(
+  s: Pick<Subscription, "billingCycle" | "cost" | "pausedAt">
+): number {
+  if (isPaused(s)) return 0;
   return s.billingCycle === "yearly" ? Number(s.cost) / 12 : Number(s.cost);
 }
 

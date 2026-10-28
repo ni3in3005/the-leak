@@ -17,6 +17,8 @@ export interface Subscription {
   cost: number;
   startDate: string;
   billingCycle: BillingCycle;
+  /** YYYY-MM-DD when paused; null/undefined = active */
+  pausedAt?: string | null;
 }
 
 export interface SubscriptionsFile {

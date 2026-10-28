@@ -288,6 +288,47 @@ button {
   position: relative;
 }
 
+.card.paused {
+  opacity: 0.92;
+  border-color: #3a4a42;
+}
+
+.cat-badge.paused-badge {
+  margin-left: 6px;
+  color: var(--amber);
+  border-color: #4a3418;
+}
+
+.paused-panel {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 16px 14px;
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.paused-title {
+  font-family: "Space Mono", monospace;
+  font-size: 14px;
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.paused-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.modal-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin: -6px 0 16px;
+  line-height: 1.45;
+}
+
 .card-top {
   display: flex;
   justify-content: space-between;

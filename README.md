@@ -148,6 +148,8 @@ After deploy, update:
 | POST | `/api/subscriptions` | Create |
 | PUT | `/api/subscriptions/:id` | Update |
 | DELETE | `/api/subscriptions/:id` | Delete |
+| POST | `/api/subscriptions/:id/pause` | Pause as of a date (`pausedAt`) |
+| POST | `/api/subscriptions/:id/resume` | Resume (clear pause) |
 | POST | `/api/seed` | Seed demo data once if empty |
 | POST | `/api/export` | JSON export + R2 backup |
 | POST | `/api/import` | Import JSON (`mode`: `replace` \| `merge`) + R2 backup |

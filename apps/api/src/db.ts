@@ -9,6 +9,7 @@ export interface SubscriptionRow {
   cost: number;
   start_date: string;
   billing_cycle: string;
+  paused_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -22,15 +23,15 @@ export function rowToSubscription(row: SubscriptionRow): Subscription {
     cost: row.cost,
     startDate: row.start_date,
     billingCycle: (row.billing_cycle === "yearly" ? "yearly" : "monthly") as BillingCycle,
+    pausedAt: row.paused_at ?? null,
   };
 }
 
+const SELECT_COLS = `id, user_id, name, category, currency, cost, start_date, billing_cycle, paused_at, created_at, updated_at`;
+
 export async function listSubscriptions(db: D1Database, userId: string): Promise<Subscription[]> {
   const { results } = await db
-    .prepare(
-      `SELECT id, user_id, name, category, currency, cost, start_date, billing_cycle, created_at, updated_at
-       FROM subscriptions WHERE user_id = ? ORDER BY created_at ASC`
-    )
+    .prepare(`SELECT ${SELECT_COLS} FROM subscriptions WHERE user_id = ? ORDER BY created_at ASC`)
     .bind(userId)
     .all<SubscriptionRow>();
   return (results ?? []).map(rowToSubscription);
@@ -42,10 +43,7 @@ export async function getSubscription(
   id: string
 ): Promise<Subscription | null> {
   const row = await db
-    .prepare(
-      `SELECT id, user_id, name, category, currency, cost, start_date, billing_cycle, created_at, updated_at
-       FROM subscriptions WHERE id = ? AND user_id = ?`
-    )
+    .prepare(`SELECT ${SELECT_COLS} FROM subscriptions WHERE id = ? AND user_id = ?`)
     .bind(id, userId)
     .first<SubscriptionRow>();
   return row ? rowToSubscription(row) : null;
@@ -55,12 +53,12 @@ export async function insertSubscription(
   db: D1Database,
   userId: string,
   id: string,
-  input: SubscriptionInput
+  input: SubscriptionInput & { pausedAt?: string | null }
 ): Promise<Subscription> {
   await db
     .prepare(
-      `INSERT INTO subscriptions (id, user_id, name, category, currency, cost, start_date, billing_cycle)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO subscriptions (id, user_id, name, category, currency, cost, start_date, billing_cycle, paused_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -70,7 +68,8 @@ export async function insertSubscription(
       input.currency,
       input.cost,
       input.startDate,
-      input.billingCycle
+      input.billingCycle,
+      input.pausedAt ?? null
     )
     .run();
   const sub = await getSubscription(db, userId, id);
@@ -103,6 +102,25 @@ export async function updateSubscription(
       id,
       userId
     )
+    .run();
+  return getSubscription(db, userId, id);
+}
+
+export async function setPausedAt(
+  db: D1Database,
+  userId: string,
+  id: string,
+  pausedAt: string | null
+): Promise<Subscription | null> {
+  const existing = await getSubscription(db, userId, id);
+  if (!existing) return null;
+  await db
+    .prepare(
+      `UPDATE subscriptions
+       SET paused_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = ? AND user_id = ?`
+    )
+    .bind(pausedAt, id, userId)
     .run();
   return getSubscription(db, userId, id);
 }
@@ -148,15 +166,15 @@ export async function markSeeded(db: D1Database, userId: string): Promise<void> 
 export async function replaceAllSubscriptions(
   db: D1Database,
   userId: string,
-  items: Array<SubscriptionInput & { id: string }>
+  items: Array<SubscriptionInput & { id: string; pausedAt?: string | null }>
 ): Promise<void> {
   const statements = [
     db.prepare(`DELETE FROM subscriptions WHERE user_id = ?`).bind(userId),
     ...items.map((item) =>
       db
         .prepare(
-          `INSERT INTO subscriptions (id, user_id, name, category, currency, cost, start_date, billing_cycle)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO subscriptions (id, user_id, name, category, currency, cost, start_date, billing_cycle, paused_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           item.id,
@@ -166,7 +184,8 @@ export async function replaceAllSubscriptions(
           item.currency,
           item.cost,
           item.startDate,
-          item.billingCycle
+          item.billingCycle,
+          item.pausedAt ?? null
         )
     ),
   ];

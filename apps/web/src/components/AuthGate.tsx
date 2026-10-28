@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../api";
 import { useApiToken } from "../hooks/useApiToken";
 import { CategoryChart } from "./CategoryChart";
+import { PauseModal } from "./PauseModal";
 import { StatsStrip } from "./StatsStrip";
 import { SubscriptionCard } from "./SubscriptionCard";
 import { SubscriptionModal } from "./SubscriptionModal";
@@ -23,6 +24,7 @@ export function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<{ text: string; error?: boolean } | null>(null);
   const [modalSub, setModalSub] = useState<Subscription | null | undefined>(undefined);
+  const [pauseSub, setPauseSub] = useState<Subscription | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const seededRef = useRef(false);
 
@@ -95,6 +97,36 @@ export function Dashboard() {
       setModalSub(undefined);
     } catch (e) {
       showBanner(e instanceof Error ? e.message : "Delete failed", true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handlePause(pausedAt: string) {
+    if (!pauseSub) return;
+    setBusy(true);
+    try {
+      const token = await getAccessToken();
+      await api.pauseSubscription(token, pauseSub.id, pausedAt);
+      await refresh();
+      setPauseSub(null);
+      showBanner(`Paused ${pauseSub.name} since ${pausedAt}`);
+    } catch (e) {
+      showBanner(e instanceof Error ? e.message : "Pause failed", true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResume(sub: Subscription) {
+    setBusy(true);
+    try {
+      const token = await getAccessToken();
+      await api.resumeSubscription(token, sub.id);
+      await refresh();
+      showBanner(`Resumed ${sub.name}`);
+    } catch (e) {
+      showBanner(e instanceof Error ? e.message : "Resume failed", true);
     } finally {
       setBusy(false);
     }
@@ -252,7 +284,14 @@ export function Dashboard() {
           ) : (
             <div className="grid">
               {subscriptions.map((s) => (
-                <SubscriptionCard key={s.id} sub={s} onEdit={() => setModalSub(s)} />
+                <SubscriptionCard
+                  key={s.id}
+                  sub={s}
+                  busy={busy}
+                  onEdit={() => setModalSub(s)}
+                  onPause={() => setPauseSub(s)}
+                  onResume={() => void handleResume(s)}
+                />
               ))}
               <button type="button" className="add-card" onClick={() => setModalSub(null)}>
                 + Add subscription
@@ -273,6 +312,15 @@ export function Dashboard() {
           onClose={() => setModalSub(undefined)}
           onSave={handleSave}
           onDelete={modalSub ? handleDelete : undefined}
+        />
+      )}
+
+      {pauseSub && (
+        <PauseModal
+          sub={pauseSub}
+          busy={busy}
+          onClose={() => setPauseSub(null)}
+          onConfirm={handlePause}
         />
       )}
     </div>
